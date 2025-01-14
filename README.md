@@ -21,11 +21,11 @@ Run (assumes a VT100-compatible terminal):
 
 ### SDL2 version
 
-Install SDL2 cmake support:
+Install SDL2, e.g. using `brew`:
 
 ```bash
-git submodule init
-git submodule update
+brew install sdl2
+brew install sdl2_ttf
 ```
 
 Compile `TetrinoSDL`:

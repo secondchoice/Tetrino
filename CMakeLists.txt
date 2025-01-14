@@ -8,7 +8,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(Tetrino main-console.cpp)
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdl2)
 find_package(SDL2 QUIET)
 find_package(SDL2_ttf QUIET)
 
@@ -23,10 +22,10 @@ FetchContent_Declare(
 )
 
 if (SDL2_FOUND)
-if (SDL2_TTF_FOUND)
+if (SDL2_ttf_FOUND)
   FetchContent_MakeAvailable(fonts)
   add_executable(TetrinoSDL main-sdl.cpp)
   target_include_directories(TetrinoSDL PRIVATE ${SDL2_INCLUDE_DIRS})
-  target_link_libraries(TetrinoSDL SDL2::Main SDL2::TTF)
+  target_link_libraries(TetrinoSDL SDL2::SDL2main SDL2::SDL2 SDL2_ttf::SDL2_ttf)
 endif()
 endif()
