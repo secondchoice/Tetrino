@@ -201,7 +201,7 @@ class TetrisConsole : public Tetris {
                      xscale, cr);
         _next_block.paste(_screen, next.pos() + Point{1, 1}, xscale);
         if (_held_block.type != Tetrimino::none) {
-            _held_block.paste(_screen, held.pos() + Point{1, 1}, false, xscale);
+            _held_block.paste(_screen, held.pos() + Point{1, 1}, xscale);
         }
 
         if (_game_state == gameover || _game_state == welcome) {
