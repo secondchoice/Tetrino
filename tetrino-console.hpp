@@ -78,7 +78,7 @@ struct Box {
 class TetrisConsole : public Tetris {
   public:
     static constexpr int intro_width = 36;
-    static constexpr int intro_height = 11;
+    static constexpr int intro_height = 15;
     static constexpr int xscale = 2;
 
     static constexpr Box held{1, 3, Tetrimino::size *xscale + 2, Tetrimino::size + 2};
@@ -206,8 +206,21 @@ class TetrisConsole : public Tetris {
 
         if (_game_state == gameover || _game_state == welcome) {
             _draw_box(intro);
-            _draw_text(_game_state == gameover ? "Game over!" : "New Game - Start",
-                       intro.pos() + Point{(intro_height - 1) / 2, (intro.height - 1) / 2});
+            const auto *msg = (_game_state == welcome) ? "Ready?\n"
+                                                         "Press space to start\n\n"
+                                                         "z:     rotate left\n"
+                                                         "x:     rotate right\n"
+                                                         "c:     hold\n"
+                                                         "left:  move left\n"
+                                                         "right: move right\n"
+                                                         "down:  soft drop\n"
+                                                         "space: hard drop\n"
+                                                         "q:     quit"
+                                                       : "Game Over";
+
+            int num_lines = std::count(msg, msg + strlen(msg), '\n') + 1;
+
+            _draw_text(msg, intro.pos() + Point{4, (intro.height - num_lines) / 2});
         }
     }
 
@@ -292,11 +305,21 @@ class TetrisConsole : public Tetris {
 
     void _draw_text(const std::string &text, Point p, int width = 0) {
         int i = 0;
-        for (; i < text.size(); ++i) {
-            _screen[p + shift_right * i] = text[i];
-        }
-        for (; i < width; ++i) {
-            _screen[p + shift_right * i] = ' ';
+        Point q = p;
+        while (i < text.size()) {
+            for (; i < text.size(); ++i, ++q.x) {
+                if (text[i] == '\n') {
+                    i += 1;
+                    goto next_line;
+                }
+                _screen[q] = text[i];
+            }
+            for (; q.x < p.x + width; ++q.x) {
+                _screen[q] = ' ';
+            }
+        next_line:;
+            q.x = p.x;
+            q.y += 1;
         }
     }
 };

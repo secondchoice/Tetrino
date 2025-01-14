@@ -5,6 +5,7 @@
 
 #include <SDL.h>
 #include <SDL_ttf.h>
+#include <algorithm>
 #include <map>
 
 class TetrisSDL : public Tetris {
@@ -39,7 +40,7 @@ class TetrisSDL : public Tetris {
     bool tic() {
         ssize_t now = (ssize_t)SDL_GetTicks64() * 1'000;
         constexpr ssize_t two_frames = (ssize_t)(2 * 1'000'000) / 60;
-        ssize_t elapsed = std::min(now - _last_frame_time, (ssize_t)20'000) ;
+        ssize_t elapsed = std::min(now - _last_frame_time, (ssize_t)20'000);
         _last_frame_time = now;
 
         ssize_t input_frame = current_frame() + 1;
@@ -128,8 +129,24 @@ class TetrisSDL : public Tetris {
             SDL_SetRenderDrawColor(_renderer, 10, 200, 10, 255);
             SDL_RenderDrawRect(_renderer, &_info);
 
-            _draw_text(_game_state == welcome ? "Ready?" : "Game Over", _info.x + _info.w / 2,
-                       _info.y + (_info.h - _font_height) / 2, true);
+            const auto *msg = (_game_state == welcome) ? "Ready?\n"
+                                                         "Press space to start\n\n"
+                                                         "z:     rotate left\n"
+                                                         "x:     rotate right\n"
+                                                         "c:     hold\n"
+                                                         "left:  move left\n"
+                                                         "right: move right\n"
+                                                         "down:  soft drop\n"
+                                                         "space: hard drop\n"
+                                                         "q:     quit"
+                                                       : "Game Over";
+
+            int line_skip = TTF_FontLineSkip(_font);
+            int num_lines = std::count(msg, msg + strlen(msg), '\n') + 1;
+            int text_height = _font_height * num_lines + (line_skip - _font_height) * (num_lines - 1);
+
+            _draw_text(msg,
+                       _info.x + _info.w / 2, _info.y + (_info.h - text_height) / 2, true);
         }
     }
 
@@ -163,7 +180,7 @@ class TetrisSDL : public Tetris {
         int dpscale = _screen_width / nominal_screen_width;
         _scale = nominal_scale * dpscale;
         int info_width = _screen_width / 2;
-        int info_height = 3 * _scale;
+        int info_height = 12 * _scale;
         int pad = _scale + _scale / 2;
 
         _font_size = nominal_font_size * dpscale;
@@ -246,7 +263,7 @@ class TetrisSDL : public Tetris {
     void _draw_text(const std::string &str, int x, int y, bool center = false) {
         if (_strings.count(str) == 0) {
             SDL_Color color = {255, 255, 255};
-            SDL_Surface *surface = TTF_RenderUTF8_Solid(_font, str.c_str(), color);
+            SDL_Surface *surface = TTF_RenderUTF8_Solid_Wrapped(_font, str.c_str(), color, 0L);
             SDL_Texture *text = SDL_CreateTextureFromSurface(_renderer, surface);
             SDL_FreeSurface(surface);
             _strings[str] = std::unique_ptr<SDL_Texture, TextureDeleter>{text};
