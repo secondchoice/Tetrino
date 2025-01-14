@@ -9,6 +9,7 @@
 #include <queue>
 #include <random>
 #include <span>
+#include <cassert>
 
 struct Point {
     int x;
