@@ -292,7 +292,7 @@ class Tetris {
         _block.paste(_matrix, _block.pos);
 
         if (_block.pos.y < matrix_height - skyline) {
-            _game_state = gameover;
+            _game_state = game_over;
         } else {
             _clear_rows();
             _can_hold = true;
@@ -342,7 +342,7 @@ class Tetris {
         _game_time += time;
 
         // Other screens.
-        if (_game_state == welcome || _game_state == gameover) {
+        if (_game_state == welcome || _game_state == game_over) {
             while (!inputs.empty()) {
                 auto key = inputs.front();
                 inputs.pop();
@@ -351,7 +351,7 @@ class Tetris {
                     if (key.state == IN::released) break;
                     if (_game_state == welcome) {
                         new_game(1);
-                    } else if (_game_state == gameover) {
+                    } else if (_game_state == game_over) {
                         _game_state = welcome;
                     } else {
                         // Ignore must have started already
@@ -366,7 +366,7 @@ class Tetris {
         }
 
         // Run all events behind the current frame time.
-        while (_game_state != gameover && _alive) {
+        while (_game_state != game_over && _alive) {
 
             // After a successful move, apply extended locking rules.
             auto accept_move = [&, this](move_t type, int now) {
@@ -401,7 +401,7 @@ class Tetris {
                 // Lockdown event
                 else if (_lock_time <= _current_time) {
                     _lock(_lock_time);
-                    if (_game_state == gameover) goto done;
+                    if (_game_state == game_over) goto done;
                 }
 
                 // Fall event
@@ -488,7 +488,7 @@ class Tetris {
                         _tally += 2 * (y - _block.pos.y);
                         _block.pos.y = y;
                         _lock(_input_time);
-                        if (_game_state == gameover) goto done;
+                        if (_game_state == game_over) goto done;
                         break;
                     }
 
@@ -573,7 +573,7 @@ class Tetris {
     enum move_t { tspin, mini_tspin, normal } _last_move;
     int _back_to_back;
     std::mt19937 _rng;
-    enum { welcome, gameover, play } _game_state;
+    enum { welcome, game_over, play } _game_state;
     struct {
         bool left : 1;
         bool right : 1;

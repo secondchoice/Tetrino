@@ -204,7 +204,7 @@ class TetrisConsole : public Tetris {
             _held_block.paste(_screen, held.pos() + Point{1, 1}, xscale);
         }
 
-        if (_game_state == gameover || _game_state == welcome) {
+        if (_game_state == game_over || _game_state == welcome) {
             _draw_box(intro);
             const auto *msg = (_game_state == welcome) ? "Ready?\n"
                                                          "Press space to start\n\n"
