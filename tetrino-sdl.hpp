@@ -20,36 +20,36 @@ class TetrisSDL : public Tetris {
     TetrisSDL(const TetrisSDL &) = delete;
     TetrisSDL &operator=(const TetrisSDL &) = delete;
 
-    TetrisSDL(unsigned int seed = 0) : Tetris{seed}, _last_frame_time{}, _font{} {
-        _window = SDL_CreateWindow("Tetrino", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                   nominal_screen_width, nominal_screen_height,
-                                   SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
-        _renderer =
-            SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    TetrisSDL(unsigned int seed = 0) : Tetris{seed}, last_frame_time{}, font{} {
+        window = SDL_CreateWindow("Tetrino", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                                  nominal_screen_width, nominal_screen_height,
+                                  SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
+        renderer =
+            SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
-        _update_geometry();
-        _last_frame_time = (ssize_t)SDL_GetTicks64() * 1'000;
+        update_geometry();
+        last_frame_time = (ssize_t)SDL_GetTicks64() * 1'000;
     }
 
     ~TetrisSDL() {
-        if (_font) TTF_CloseFont(_font);
-        SDL_DestroyRenderer(_renderer);
-        SDL_DestroyWindow(_window);
+        if (font) TTF_CloseFont(font);
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
     }
 
     bool tic() {
         ssize_t now = (ssize_t)SDL_GetTicks64() * 1'000;
         constexpr ssize_t two_frames = (ssize_t)(2 * 1'000'000) / 60;
-        ssize_t elapsed = std::min(now - _last_frame_time, (ssize_t)20'000);
-        _last_frame_time = now;
+        ssize_t elapsed = std::min(now - last_frame_time, (ssize_t)20'000);
+        last_frame_time = now;
 
         ssize_t input_frame = current_frame() + 1;
         Tetris::Input::value_t command;
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
-                _inputs.push({command, Tetris::Input::pressed, input_frame});
-                _inputs.push({command, Tetris::Input::released, input_frame});
+                inputs.push({command, Tetris::Input::pressed, input_frame});
+                inputs.push({command, Tetris::Input::released, input_frame});
             } else if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) &&
                        event.key.repeat == 0) {
                 Tetris::Input::value_t value;
@@ -66,167 +66,166 @@ class TetrisSDL : public Tetris {
                 case SDLK_q: value = Tetris::Input::quit; break;
                 default: continue;
                 }
-                _inputs.push({value, state, input_frame});
+                inputs.push({value, state, input_frame});
             }
         }
-        return Tetris::tic(elapsed, _inputs);
+        return Tetris::tic(elapsed, inputs);
     }
 
     void draw() {
-        SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
-        SDL_RenderClear(_renderer);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
 
-        SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
-        SDL_RenderDrawRect(_renderer, &_field_box);
-        SDL_RenderDrawRect(_renderer, &_next_box);
-        SDL_RenderDrawRect(_renderer, &_held_box);
-        _draw_text("Next", _next_box.x + _next_box.w / 2, _next_box.y + _next_box.h + 2, true);
-        _draw_text("Held", _held_box.x + _held_box.w / 2, _held_box.y + _held_box.h + 2, true);
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_RenderDrawRect(renderer, &field_box);
+        SDL_RenderDrawRect(renderer, &next_box);
+        SDL_RenderDrawRect(renderer, &held_box);
+        draw_text("Next", next_box.x + next_box.w / 2, next_box.y + next_box.h + 2, true);
+        draw_text("Held", held_box.x + held_box.w / 2, held_box.y + held_box.h + 2, true);
 
         int crop = matrix_height - skyline;
-        _draw_image(_matrix,          //
-                    _field_box.x + 1, //
-                    _field_box.y, _scale, crop);
+        draw_image(matrix,          //
+                   field_box.x + 1, //
+                   field_box.y, scale, crop);
 
-        _draw_image(_ghost_block,                                   //
-                    _field_box.x + 1 + _ghost_block.pos.x * _scale, //
-                    _field_box.y + (_ghost_block.pos.y - crop) * _scale, _scale);
+        draw_image(ghost_block,                                 //
+                   field_box.x + 1 + ghost_block.pos.x * scale, //
+                   field_box.y + (ghost_block.pos.y - crop) * scale, scale);
 
-        _draw_image(_block,                                   //
-                    _field_box.x + 1 + _block.pos.x * _scale, //
-                    _field_box.y + (_block.pos.y - crop) * _scale, _scale);
+        draw_image(block,                                 //
+                   field_box.x + 1 + block.pos.x * scale, //
+                   field_box.y + (block.pos.y - crop) * scale, scale);
 
         {
             // Hide everything above the skyline except for a few pixels.
-            SDL_Rect hide = {_field_box.x + 1, 0, _field_box.w - 2, _field_box.y - _scale / 2};
-            SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
-            SDL_RenderFillRect(_renderer, &hide);
+            SDL_Rect hide = {field_box.x + 1, 0, field_box.w - 2, field_box.y - scale / 2};
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_RenderFillRect(renderer, &hide);
         }
 
-        _draw_image(_next_block, _next_box.x + 1, _next_box.y + 1, _scale);
+        draw_image(next_block, next_box.x + 1, next_box.y + 1, scale);
 
-        if (_held_block.type != Tetrimino::none) {
-            _draw_image(_held_block, _held_box.x + 1, _held_box.y + 1, _scale);
+        if (held_block.type != Tetrimino::none) {
+            draw_image(held_block, held_box.x + 1, held_box.y + 1, scale);
         }
 
-        _draw_text(std::string{"Score "} + std::to_string(_tally), _right_score_box.x,
-                   _right_score_box.y);
+        draw_text(std::string{"Score "} + std::to_string(tally), right_score_box.x,
+                  right_score_box.y);
 
         for (int i = 0; i < 5; ++i) {
-            int m = _messages.size() - i - 1;
+            int m = messages.size() - i - 1;
             if (m < 0) break;
-            _draw_text(_messages[m], _right_score_box.x, _right_score_box.y + _line_skip * (3 + i));
+            draw_text(messages[m], right_score_box.x, right_score_box.y + line_skip * (3 + i));
         }
 
-        _draw_text(std::string{"Level "} + std::to_string(_level), _left_score_box.x,
-                   _left_score_box.y);
+        draw_text(std::string{"Level "} + std::to_string(level), left_score_box.x,
+                  left_score_box.y);
 
-        _draw_text(std::string{"Cleared "} + std::to_string(_num_lines_cleared), _left_score_box.x,
-                   _left_score_box.y + _line_skip);
+        draw_text(std::string{"Cleared "} + std::to_string(num_lines_cleared), left_score_box.x,
+                  left_score_box.y + line_skip);
 
-        if (_game_state == welcome || _game_state == game_over) {
-            SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
-            SDL_RenderFillRect(_renderer, &_info_box);
+        if (game_state == WELCOME || game_state == GAME_OVER) {
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_RenderFillRect(renderer, &info_box);
 
-            SDL_SetRenderDrawColor(_renderer, 10, 200, 10, 255);
-            SDL_RenderDrawRect(_renderer, &_info_box);
+            SDL_SetRenderDrawColor(renderer, 10, 200, 10, 255);
+            SDL_RenderDrawRect(renderer, &info_box);
 
-            const auto *msg = (_game_state == welcome) ? "Ready?\n"
-                                                         "Press space to start\n\n"
-                                                         "z:     rotate left\n"
-                                                         "x:     rotate right\n"
-                                                         "c:     hold\n"
-                                                         "left:  move left\n"
-                                                         "right: move right\n"
-                                                         "down:  soft drop\n"
-                                                         "space: hard drop\n"
-                                                         "q:     quit"
-                                                       : "Game Over";
+            const auto *msg = (game_state == WELCOME) ? "Ready?\n"
+                                                        "Press space to start\n\n"
+                                                        "z:     rotate left\n"
+                                                        "x:     rotate right\n"
+                                                        "c:     hold\n"
+                                                        "left:  move left\n"
+                                                        "right: move right\n"
+                                                        "down:  soft drop\n"
+                                                        "space: hard drop\n"
+                                                        "q:     quit"
+                                                      : "Game Over";
 
-            int line_skip = TTF_FontLineSkip(_font);
+            int line_skip = TTF_FontLineSkip(font);
             int num_lines = std::count(msg, msg + strlen(msg), '\n') + 1;
-            int text_height =
-                _font_height * num_lines + (line_skip - _font_height) * (num_lines - 1);
+            int text_height = font_height * num_lines + (line_skip - font_height) * (num_lines - 1);
 
-            _draw_text(msg, _info_box.x + _info_box.w / 2,
-                       _info_box.y + (_info_box.h - text_height) / 2, true);
+            draw_text(msg, info_box.x + info_box.w / 2, info_box.y + (info_box.h - text_height) / 2,
+                      true);
         }
     }
 
-    void present() { SDL_RenderPresent(_renderer); }
+    void present() { SDL_RenderPresent(renderer); }
 
   protected:
-    std::queue<Tetris::Input> _inputs;
+    std::queue<Tetris::Input> inputs;
 
-    int _scale;
-    int _screen_width;
-    int _screen_height;
-    SDL_Rect _field_box;
-    SDL_Rect _info_box;
-    SDL_Rect _next_box;
-    SDL_Rect _held_box;
-    SDL_Rect _right_score_box;
-    SDL_Rect _left_score_box;
+    int scale;
+    int screen_width;
+    int screen_height;
+    SDL_Rect field_box;
+    SDL_Rect info_box;
+    SDL_Rect next_box;
+    SDL_Rect held_box;
+    SDL_Rect right_score_box;
+    SDL_Rect left_score_box;
 
-    SDL_Window *_window;
-    SDL_Renderer *_renderer;
-    static constexpr char _font_path[] = "font.ttf";
-    TTF_Font *_font;
-    int _font_size;
-    int _font_height;
-    int _line_skip;
-    ssize_t _last_frame_time;
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    static constexpr char font_path[] = "font.ttf";
+    TTF_Font *font;
+    int font_size;
+    int font_height;
+    int line_skip;
+    ssize_t last_frame_time;
 
-    void _update_geometry() {
-        SDL_GetRendererOutputSize(_renderer, &_screen_width, &_screen_height);
+    void update_geometry() {
+        SDL_GetRendererOutputSize(renderer, &screen_width, &screen_height);
 
-        int dpscale = _screen_width / nominal_screen_width;
-        _scale = nominal_scale * dpscale;
-        int info_width = _screen_width / 2;
-        int info_height = 12 * _scale;
-        int pad = _scale + _scale / 2;
+        int dpscale = screen_width / nominal_screen_width;
+        scale = nominal_scale * dpscale;
+        int info_width = screen_width / 2;
+        int info_height = 12 * scale;
+        int pad = scale + scale / 2;
 
-        _font_size = nominal_font_size * dpscale;
-        if (_font) TTF_CloseFont(_font);
-        _font = TTF_OpenFont(_font_path, _font_size);
-        assert(_font);
-        _font_height = TTF_FontHeight(_font);
-        _line_skip = TTF_FontLineSkip(_font);
+        font_size = nominal_font_size * dpscale;
+        if (font) TTF_CloseFont(font);
+        font = TTF_OpenFont(font_path, font_size);
+        assert(font);
+        font_height = TTF_FontHeight(font);
+        line_skip = TTF_FontLineSkip(font);
 
-        _field_box = {.x = (_screen_width - (matrix_width * _scale + 2)) / 2, //
-                      .y = (_screen_height - (skyline * _scale + 1)) / 2,     //
-                      .w = matrix_width * _scale + 2,                         //
-                      .h = skyline * _scale + 1};
+        field_box = {.x = (screen_width - (matrix_width * scale + 2)) / 2, //
+                     .y = (screen_height - (skyline * scale + 1)) / 2,     //
+                     .w = matrix_width * scale + 2,                        //
+                     .h = skyline * scale + 1};
 
-        _info_box = {.x = (_screen_width - info_width) / 2,   //
-                     .y = (_screen_height - info_height) / 2, //
-                     .w = info_width,                         //
-                     .h = info_height};
+        info_box = {.x = (screen_width - info_width) / 2,   //
+                    .y = (screen_height - info_height) / 2, //
+                    .w = info_width,                        //
+                    .h = info_height};
 
-        _next_box = {.x = _field_box.x + _field_box.w +
-                          (_field_box.x - Tetrimino::size * _scale - 2) / 2, //
-                     .y = _field_box.y,                                      //
-                     .w = Tetrimino::size * _scale + 2,                      //
-                     .h = Tetrimino::size * _scale + 2};
+        next_box = {.x = field_box.x + field_box.w +
+                         (field_box.x - Tetrimino::size * scale - 2) / 2, //
+                    .y = field_box.y,                                     //
+                    .w = Tetrimino::size * scale + 2,                     //
+                    .h = Tetrimino::size * scale + 2};
 
-        _held_box = {.x = _field_box.x - _next_box.w -
-                          (_field_box.x - Tetrimino::size * _scale - 2) / 2, //
-                     .y = _field_box.y,                                      //
-                     .w = _next_box.w,                                       //
-                     .h = _next_box.h};
+        held_box = {.x = field_box.x - next_box.w -
+                         (field_box.x - Tetrimino::size * scale - 2) / 2, //
+                    .y = field_box.y,                                     //
+                    .w = next_box.w,                                      //
+                    .h = next_box.h};
 
-        _right_score_box = {.x = _field_box.x + _field_box.w + pad,                       //
-                            .y = _next_box.y + _next_box.h + 3 * _line_skip,              //
-                            .w = _screen_width - (_field_box.x + _field_box.w + 2 * pad), //
-                            .h = _screen_height - (_next_box.y + _next_box.h + 2 * pad)};
+        right_score_box = {.x = field_box.x + field_box.w + pad,                      //
+                           .y = next_box.y + next_box.h + 3 * line_skip,              //
+                           .w = screen_width - (field_box.x + field_box.w + 2 * pad), //
+                           .h = screen_height - (next_box.y + next_box.h + 2 * pad)};
 
-        _left_score_box = {.x = pad,                    //
-                           .y = _right_score_box.y,     //
-                           .w = _field_box.x - 2 * pad, //
-                           .h = _right_score_box.h};
+        left_score_box = {.x = pad,                   //
+                          .y = right_score_box.y,     //
+                          .w = field_box.x - 2 * pad, //
+                          .h = right_score_box.h};
     }
 
-    std::array<uint8_t, 3> _get_tetrimino_color(Tetrimino::type_t type) const {
+    std::array<uint8_t, 3> get_tetrimino_color(Tetrimino::type_t type) const {
         std::array<uint8_t, 3> color{};
         switch (type) {
         case Tetrimino::I: color = {0, 255, 255}; break;
@@ -243,7 +242,7 @@ class TetrisSDL : public Tetris {
     }
 
     template <int W, int H>
-    void _draw_image(const Image<W, H> &image, int x, int y, int s, int crop_top = 0) {
+    void draw_image(const Image<W, H> &image, int x, int y, int s, int crop_top = 0) {
         for (int r = crop_top; r < H; ++r) {
             for (int c = 0; c < W; ++c) {
                 int type = image[{c, r}];
@@ -252,9 +251,9 @@ class TetrisSDL : public Tetris {
                               .y = y + (r - crop_top) * s,
                               .w = s,
                               .h = s};
-                auto color = _get_tetrimino_color(static_cast<Tetrimino::type_t>(type));
-                SDL_SetRenderDrawColor(_renderer, color[0], color[1], color[2], 255);
-                SDL_RenderFillRect(_renderer, &tile);
+                auto color = get_tetrimino_color(static_cast<Tetrimino::type_t>(type));
+                SDL_SetRenderDrawColor(renderer, color[0], color[1], color[2], 255);
+                SDL_RenderFillRect(renderer, &tile);
             }
         }
     }
@@ -263,21 +262,21 @@ class TetrisSDL : public Tetris {
     struct TextureDeleter {
         void operator()(SDL_Texture *t) { SDL_DestroyTexture(t); }
     };
-    std::map<std::string, std::unique_ptr<SDL_Texture, TextureDeleter>> _strings;
+    std::map<std::string, std::unique_ptr<SDL_Texture, TextureDeleter>> strings;
 
-    void _draw_text(const std::string &str, int x, int y, bool center = false) {
-        if (_strings.count(str) == 0) {
+    void draw_text(const std::string &str, int x, int y, bool center = false) {
+        if (strings.count(str) == 0) {
             SDL_Color color = {255, 255, 255};
-            SDL_Surface *surface = TTF_RenderUTF8_Solid_Wrapped(_font, str.c_str(), color, 0L);
-            SDL_Texture *text = SDL_CreateTextureFromSurface(_renderer, surface);
+            SDL_Surface *surface = TTF_RenderUTF8_Solid_Wrapped(font, str.c_str(), color, 0L);
+            SDL_Texture *text = SDL_CreateTextureFromSurface(renderer, surface);
             SDL_FreeSurface(surface);
-            _strings[str] = std::unique_ptr<SDL_Texture, TextureDeleter>{text};
+            strings[str] = std::unique_ptr<SDL_Texture, TextureDeleter>{text};
         }
-        SDL_Texture *text = _strings[str].get();
+        SDL_Texture *text = strings[str].get();
         int w, h;
         SDL_QueryTexture(text, nullptr, nullptr, &w, &h);
         SDL_Rect rect{x - (center ? w / 2 : 0), y, w, h};
-        SDL_RenderCopy(_renderer, text, NULL, &rect);
+        SDL_RenderCopy(renderer, text, NULL, &rect);
     }
 };
 

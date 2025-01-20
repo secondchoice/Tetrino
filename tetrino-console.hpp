@@ -29,45 +29,45 @@ class VT100 {
 
     VT100() {
         // Configure TTY.
-        tcgetattr(STDIN_FILENO, &_original_tty);
-        _tty = _original_tty;
-        _tty.c_lflag &= ~(ICANON | ECHO); // raw mode
-        _tty.c_cc[VMIN] = 0;              // min input char (non-blocking)
-        tcsetattr(STDIN_FILENO, TCSANOW, &_tty);
+        tcgetattr(STDIN_FILENO, &original_tty);
+        tty = original_tty;
+        tty.c_lflag &= ~(ICANON | ECHO); // raw mode
+        tty.c_cc[VMIN] = 0;              // min input char (non-blocking)
+        tcsetattr(STDIN_FILENO, TCSANOW, &tty);
 
         // Time reference.
-        _time_origin = std::chrono::steady_clock::now();
+        time_origin = std::chrono::steady_clock::now();
     }
 
     ~VT100() {
-        tcsetattr(STDIN_FILENO, TCSANOW, &_original_tty);
+        tcsetattr(STDIN_FILENO, TCSANOW, &original_tty);
         std::cout << VT100::cursor(true) << std::flush;
     }
 
     ssize_t now() const {
         auto now = std::chrono::steady_clock::now();
-        return std::chrono::duration_cast<std::chrono::microseconds>(now - _time_origin).count();
+        return std::chrono::duration_cast<std::chrono::microseconds>(now - time_origin).count();
     }
 
     int nextc() {
-        if (_pos >= _count) {
-            _count = read(STDIN_FILENO, _buffer.data(), _buffer.size());
-            _pos = 0;
+        if (pos >= count) {
+            count = read(STDIN_FILENO, buffer.data(), buffer.size());
+            pos = 0;
         }
-        if (_pos >= _count) {
+        if (pos >= count) {
             return EOF;
         }
-        return _buffer[_pos++];
+        return buffer[pos++];
     }
 
   private:
-    struct termios _original_tty;
-    struct termios _tty;
-    time_t _time_origin;
+    struct termios original_tty;
+    struct termios tty;
+    time_t time_origin;
 
-    std::array<char, 32> _buffer;
-    int _pos;
-    int _count;
+    std::array<char, 32> buffer;
+    int pos;
+    int count;
 };
 
 struct Box {
@@ -81,18 +81,19 @@ class TetrisConsole : public Tetris {
     static constexpr int intro_height = 15;
     static constexpr int xscale = 2;
 
-    static constexpr Box held{1, 3, Tetrimino::size *xscale + 2, Tetrimino::size + 2};
-    static constexpr Box field{held.x + held.width + 7, held.y, matrix_width *xscale + 2,
-                               skyline + 1};
-    static constexpr Box next{field.x + field.width + 2, held.y, held.width, held.height};
-    static constexpr Box tally{next.x, next.y + next.height + 1, 10};
-    static constexpr Box info{held.x, held.y + held.height + 1, held.width + 4};
+    static constexpr Box held_box{1, 3, Tetrimino::size *xscale + 2, Tetrimino::size + 2};
+    static constexpr Box field_box{held_box.x + held_box.width + 7, held_box.y,
+                                   matrix_width *xscale + 2, skyline + 1};
+    static constexpr Box next_box{field_box.x + field_box.width + 2, held_box.y, held_box.width,
+                                  held_box.height};
+    static constexpr Box tally_box{next_box.x, next_box.y + next_box.height + 1, 10};
+    static constexpr Box info_box{held_box.x, held_box.y + held_box.height + 1, held_box.width + 4};
 
-    static constexpr int screen_width = tally.x + tally.width;
-    static constexpr int screen_height = field.y + field.height;
+    static constexpr int screen_width = tally_box.x + tally_box.width;
+    static constexpr int screen_height = field_box.y + field_box.height;
 
-    static constexpr Box intro{(screen_width - intro_width) / 2, (screen_height - intro_height) / 2,
-                               intro_width, intro_height};
+    static constexpr Box intro_box{(screen_width - intro_width) / 2,
+                                   (screen_height - intro_height) / 2, intro_width, intro_height};
 
     enum Tiles {
         border_v = 512,
@@ -106,19 +107,19 @@ class TetrisConsole : public Tetris {
     TetrisConsole(unsigned int seed = 0) : Tetris(seed) {
         std::cout << VT100::clear() << VT100::cursor_to_origin() << VT100::cursor(false)
                   << std::flush;
-        _last_frame_time = console.now();
-        _last_sync_time = never;
+        last_frame_time = console.now();
+        last_sync_time = never;
     }
 
     ~TetrisConsole() { std::cout << VT100::cursor(true) << std::flush; }
 
-    const Image<screen_width, screen_height> &screen() const { return _screen; }
+    const Image<screen_width, screen_height> &get_screen() const { return screen; }
 
     bool tic() {
         ssize_t now = console.now();
         constexpr ssize_t two_frames = (ssize_t)(2 * 1'000'000) / 60;
-        ssize_t elapsed = std::min(now - _last_frame_time, two_frames);
-        _last_frame_time = now;
+        ssize_t elapsed = std::min(now - last_frame_time, two_frames);
+        last_frame_time = now;
 
         // Read input buffer
         ssize_t input_frame = current_frame() + 1;
@@ -143,97 +144,98 @@ class TetrisConsole : public Tetris {
             case ' ': command = Tetris::Input::hard_drop; break;
             case 'q': command = Tetris::Input::quit; break;
             case 'c': command = Tetris::Input::hold; break;
-            case 'r': _old_screen.clear(0); continue; // redraw
+            case 'r': old_screen.clear(0); continue; // redraw
             default: continue;
             }
-            _inputs.push({command, Tetris::Input::pressed, input_frame});
-            _inputs.push({command, Tetris::Input::released, input_frame});
+            inputs.push({command, Tetris::Input::pressed, input_frame});
+            inputs.push({command, Tetris::Input::released, input_frame});
         }
 
-        return Tetris::tic(elapsed, _inputs);
+        return Tetris::tic(elapsed, inputs);
     }
 
     void throttle() {
         ssize_t now = console.now();
         constexpr ssize_t one_frame = (ssize_t)(1'000'000) / 60;
-        ssize_t idle = std::max(now - (_last_sync_time + one_frame), (ssize_t)0);
-        _last_sync_time = now;
+        ssize_t idle = std::max(now - (last_sync_time + one_frame), (ssize_t)0);
+        last_sync_time = now;
         std::this_thread::sleep_for(std::chrono::microseconds(idle));
     }
 
     void draw() {
-        _screen.clear();
+        screen.clear();
 
-        _draw_box(field, true);
-        _draw_box(held);
-        _draw_box(next);
-        _draw_text("Next", next.pos() + Point{3, next.height - 1});
-        _draw_text("Held", held.pos() + Point{3, held.height - 1});
+        draw_box(field_box, true);
+        draw_box(held_box);
+        draw_box(next_box);
+        draw_text("Next", next_box.pos() + Point{3, next_box.height - 1});
+        draw_text("Held", held_box.pos() + Point{3, held_box.height - 1});
         for (int i = 0; i < skyline; ++i) {
-            _draw_text(std::to_string(i + 1), field.pos() + Point{-3, field.height - 2 - i}, 2);
+            draw_text(std::to_string(i + 1), field_box.pos() + Point{-3, field_box.height - 2 - i},
+                      2);
         }
 
-        _draw_text(std::string{"Score "} + std::to_string(_tally), tally.pos(), tally.width);
+        draw_text(std::string{"Score "} + std::to_string(tally), tally_box.pos(), tally_box.width);
 
         for (int i = 0; i < 5; ++i) {
-            int m = _messages.size() - i - 1;
+            int m = messages.size() - i - 1;
             if (m < 0) break;
-            _draw_text(_messages[m], tally.pos() + shift_down * (2 + i), tally.width);
+            draw_text(messages[m], tally_box.pos() + shift_down * (2 + i), tally_box.width);
         }
 
-        _draw_text(std::string{"Level "} + std::to_string(_level),
-                   info.pos() + shift_down * info.height, info.width);
+        draw_text(std::string{"Level "} + std::to_string(level),
+                  info_box.pos() + shift_down * info_box.height, info_box.width);
 
-        _draw_text(std::string{"Cleared "} + std::to_string(_num_lines_cleared),
-                   info.pos() + shift_down * (info.height + 1), info.width);
+        draw_text(std::string{"Cleared "} + std::to_string(num_lines_cleared),
+                  info_box.pos() + shift_down * (info_box.height + 1), info_box.width);
 
         int ycrop = matrix_height - skyline;
-        _matrix.paste(_screen, field.pos() + shift_right, xscale, ycrop);
-        if (_ghost_block.type != Tetrimino::none) {
-            _ghost_block.paste(
-                _screen,
-                field.pos() + Point{_ghost_block.pos.x * xscale + 1, _ghost_block.pos.y - ycrop},
-                xscale);
+        matrix.paste(screen, field_box.pos() + shift_right, xscale, ycrop);
+        if (ghost_block.type != Tetrimino::none) {
+            ghost_block.paste(screen,
+                              field_box.pos() +
+                                  Point{ghost_block.pos.x * xscale + 1, ghost_block.pos.y - ycrop},
+                              xscale);
         }
-        int cr = std::max(ycrop - 1 - _block.pos.y, 0);
-        _block.paste(_screen,
-                     field.pos() + Point{1 + _block.pos.x * xscale, _block.pos.y + cr - ycrop},
-                     xscale, cr);
-        _next_block.paste(_screen, next.pos() + Point{1, 1}, xscale);
-        if (_held_block.type != Tetrimino::none) {
-            _held_block.paste(_screen, held.pos() + Point{1, 1}, xscale);
+        int cr = std::max(ycrop - 1 - block.pos.y, 0);
+        block.paste(screen,
+                    field_box.pos() + Point{1 + block.pos.x * xscale, block.pos.y + cr - ycrop},
+                    xscale, cr);
+        next_block.paste(screen, next_box.pos() + Point{1, 1}, xscale);
+        if (held_block.type != Tetrimino::none) {
+            held_block.paste(screen, held_box.pos() + Point{1, 1}, xscale);
         }
 
-        if (_game_state == game_over || _game_state == welcome) {
-            _draw_box(intro);
-            const auto *msg = (_game_state == welcome) ? "Ready?\n"
-                                                         "Press space to start\n\n"
-                                                         "z:     rotate left\n"
-                                                         "x:     rotate right\n"
-                                                         "c:     hold\n"
-                                                         "left:  move left\n"
-                                                         "right: move right\n"
-                                                         "down:  soft drop\n"
-                                                         "space: hard drop\n"
-                                                         "q:     quit"
-                                                       : "Game Over";
+        if (game_state == GAME_OVER || game_state == WELCOME) {
+            draw_box(intro_box);
+            const auto *msg = (game_state == WELCOME) ? "Ready?\n"
+                                                        "Press space to start\n\n"
+                                                        "z:     rotate left\n"
+                                                        "x:     rotate right\n"
+                                                        "c:     hold\n"
+                                                        "left:  move left\n"
+                                                        "right: move right\n"
+                                                        "down:  soft drop\n"
+                                                        "space: hard drop\n"
+                                                        "q:     quit"
+                                                      : "Game Over";
 
             int num_lines = std::count(msg, msg + strlen(msg), '\n') + 1;
 
-            _draw_text(msg, intro.pos() + Point{4, (intro.height - num_lines) / 2});
+            draw_text(msg, intro_box.pos() + Point{4, (intro_box.height - num_lines) / 2});
         }
     }
 
     void present() {
-        for (int y = 0; y < _screen.height; y++) {
-            auto row = _screen[y];
-            auto old_row = _old_screen[y];
+        for (int y = 0; y < screen.height; y++) {
+            auto row = screen[y];
+            auto old_row = old_screen[y];
             auto same = equal(begin(row), end(row), begin(old_row));
             if (same) continue;
             copy(begin(row), end(row), begin(old_row));
-            if (_cursor_y != y) {
+            if (cursor_y != y) {
                 std::cout << VT100::cursor_to(y + 1, 1);
-                _cursor_y = y;
+                cursor_y = y;
             }
             std::cout << VT100::color(39);
             int current_color = 39; // default
@@ -273,25 +275,25 @@ class TetrisConsole : public Tetris {
                 std::cout << glyph;
             }
             std::cout << '\n';
-            _cursor_y++;
+            cursor_y++;
         }
         std::cout << std::flush;
     }
 
   protected:
     VT100 console;
-    std::queue<Tetris::Input> _inputs;
-    Image<screen_width, screen_height> _screen;
-    Image<screen_width, screen_height> _old_screen;
-    int _cursor_y;
-    ssize_t _last_frame_time;
-    ssize_t _last_sync_time;
+    std::queue<Tetris::Input> inputs;
+    Image<screen_width, screen_height> screen;
+    Image<screen_width, screen_height> old_screen;
+    int cursor_y;
+    ssize_t last_frame_time;
+    ssize_t last_sync_time;
 
-    void _draw_box(const Box &box, bool open_top = false) {
+    void draw_box(const Box &box, bool open_top = false) {
         int y = box.y;
         auto draw_line = [&](int left, int middle, int right) {
             for (int x = box.x; x < box.x + box.width; ++x) {
-                _screen[{x, y}] =
+                screen[{x, y}] =
                     (x == box.x) ? left : ((x == box.x + box.width - 1) ? right : middle);
             }
             y += 1;
@@ -303,7 +305,7 @@ class TetrisConsole : public Tetris {
         draw_line(border_bl, border_h, border_br);
     }
 
-    void _draw_text(const std::string &text, Point p, int width = 0) {
+    void draw_text(const std::string &text, Point p, int width = 0) {
         int i = 0;
         Point q = p;
         while (i < text.size()) {
@@ -312,10 +314,10 @@ class TetrisConsole : public Tetris {
                     i += 1;
                     goto next_line;
                 }
-                _screen[q] = text[i];
+                screen[q] = text[i];
             }
             for (; q.x < p.x + width; ++q.x) {
-                _screen[q] = ' ';
+                screen[q] = ' ';
             }
         next_line:;
             q.x = p.x;
