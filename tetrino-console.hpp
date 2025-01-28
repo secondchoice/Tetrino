@@ -22,6 +22,7 @@ class VT100 {
         return "\e[" + std::to_string(r) + ";" + std::to_string(c) + "H";
     }
     static std::string color(int c) { return "\e[" + std::to_string(c) + "m"; }
+    static std::string reversed(bool on) { return on ? "\e[7m" : "\e[27m"; }
     static std::string cursor(bool on) { return std::string{"\e[?25"} + (on ? 'h' : 'l'); }
     static std::string reset() { return "\e[0m"; }
 
@@ -237,40 +238,51 @@ class TetrisConsole : public Tetris {
                 std::cout << VT100::cursor_to(y + 1, 1);
                 cursor_y = y;
             }
-            std::cout << VT100::color(39);
+            std::cout << VT100::color(39) << VT100::reversed(false);
             int current_color = 39; // default
+            bool current_reversed = false;
             for (auto tile : row) {
                 int color;
+                int reversed;
                 std::string glyph;
 #undef CASE
-#define CASE(T, C, G)                                                                              \
+#define CASE(T, C, R, G)                                                                           \
     case T:                                                                                        \
         color = C;                                                                                 \
         glyph = G;                                                                                 \
+        reversed = R;                                                                              \
         break;
                 switch (tile) {
-                    CASE(Tetrimino::I, 96, "█");
-                    CASE(Tetrimino::J, 94, "█");
-                    CASE(Tetrimino::L, 91, "█");
-                    CASE(Tetrimino::O, 93, "█");
-                    CASE(Tetrimino::S, 92, "█");
-                    CASE(Tetrimino::T, 95, "█");
-                    CASE(Tetrimino::Z, 31, "█");
-                    CASE(Tetrimino::G, 37, "░");
-                    CASE(border_v, 39, "│");
-                    CASE(border_h, 39, "─");
-                    CASE(border_tl, 39, "╭");
-                    CASE(border_tr, 39, "╮");
-                    CASE(border_bl, 39, "╰");
-                    CASE(border_br, 39, "╯");
+                    // We use reversed space to draw the tetriminos as some
+                    // console fonts implement the block character
+                    // incorrectly
+                    CASE(Tetrimino::I, 96, true, " "); 
+                    CASE(Tetrimino::J, 94, true, " ");
+                    CASE(Tetrimino::L, 91, true, " ");
+                    CASE(Tetrimino::O, 93, true, " ");
+                    CASE(Tetrimino::S, 92, true, " ");
+                    CASE(Tetrimino::T, 95, true, " ");
+                    CASE(Tetrimino::Z, 31, true, " ");
+                    CASE(Tetrimino::G, 97, true, " ");
+                    CASE(border_v, 39, false, "│");
+                    CASE(border_h, 39, false, "─");
+                    CASE(border_tl, 39, false, "╭");
+                    CASE(border_tr, 39, false, "╮");
+                    CASE(border_bl, 39, false, "╰");
+                    CASE(border_br, 39, false, "╯");
                 default:
                     color = 39;
+                    reversed = false;
                     glyph = (char)tile;
                     break;
                 }
                 if (color != current_color) {
                     std::cout << VT100::color(color);
                     current_color = color;
+                }
+                if (reversed != current_reversed) {
+                    std::cout << VT100::reversed(reversed);
+                    current_reversed = reversed;
                 }
                 std::cout << glyph;
             }
