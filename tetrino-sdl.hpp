@@ -44,26 +44,26 @@ class TetrisSDL : public Tetris {
         last_frame_time = now;
 
         ssize_t input_frame = current_frame() + 1;
-        Tetris::Input::value_t command;
+        Tetris::Input::Value command;
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
-                inputs.push({command, Tetris::Input::pressed, input_frame});
-                inputs.push({command, Tetris::Input::released, input_frame});
+                inputs.push({command, Tetris::Input::State::pressed, input_frame});
+                inputs.push({command, Tetris::Input::State::released, input_frame});
             } else if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) &&
                        event.key.repeat == 0) {
-                Tetris::Input::value_t value;
+                Tetris::Input::Value value;
                 auto state =
-                    (event.type == SDL_KEYDOWN) ? Tetris::Input::pressed : Tetris::Input::released;
+                    (event.type == SDL_KEYDOWN) ? Tetris::Input::State::pressed : Tetris::Input::State::released;
                 switch (event.key.keysym.sym) {
-                case SDLK_LEFT: value = Tetris::Input::move_left; break;
-                case SDLK_RIGHT: value = Tetris::Input::move_right; break;
-                case SDLK_DOWN: value = Tetris::Input::soft_drop; break;
-                case SDLK_SPACE: value = Tetris::Input::hard_drop; break;
-                case SDLK_z: value = Tetris::Input::rotate_left; break;
-                case SDLK_x: value = Tetris::Input::rotate_right; break;
-                case SDLK_c: value = Tetris::Input::hold; break;
-                case SDLK_q: value = Tetris::Input::quit; break;
+                case SDLK_LEFT: value = Tetris::Input::Value::move_left; break;
+                case SDLK_RIGHT: value = Tetris::Input::Value::move_right; break;
+                case SDLK_DOWN: value = Tetris::Input::Value::soft_drop; break;
+                case SDLK_SPACE: value = Tetris::Input::Value::hard_drop; break;
+                case SDLK_z: value = Tetris::Input::Value::rotate_left; break;
+                case SDLK_x: value = Tetris::Input::Value::rotate_right; break;
+                case SDLK_c: value = Tetris::Input::Value::hold; break;
+                case SDLK_q: value = Tetris::Input::Value::quit; break;
                 default: continue;
                 }
                 inputs.push({value, state, input_frame});
@@ -124,14 +124,14 @@ class TetrisSDL : public Tetris {
         draw_text(std::string{"Cleared "} + std::to_string(num_lines_cleared), left_score_box.x,
                   left_score_box.y + line_skip);
 
-        if (game_state == WELCOME || game_state == GAME_OVER) {
+        if (game_state == GameState::WELCOME || game_state == GameState::GAME_OVER) {
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderFillRect(renderer, &info_box);
 
             SDL_SetRenderDrawColor(renderer, 10, 200, 10, 255);
             SDL_RenderDrawRect(renderer, &info_box);
 
-            const auto *msg = (game_state == WELCOME) ? "Ready?\n"
+            const auto *msg = (game_state == GameState::WELCOME) ? "Ready?\n"
                                                         "Press space to start\n\n"
                                                         "z:     rotate left\n"
                                                         "x:     rotate right\n"

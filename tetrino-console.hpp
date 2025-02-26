@@ -124,32 +124,32 @@ class TetrisConsole : public Tetris {
 
         // Read input buffer
         ssize_t input_frame = current_frame() + 1;
-        Tetris::Input::value_t command;
+        Tetris::Input::Value command;
         int c;
         while ((c = console.nextc()) != EOF) {
             switch (c) {
             case '\e':
                 if ((c = console.nextc()) == '[') {
                     switch (c = console.nextc()) {
-                    case 'D': command = Tetris::Input::move_left; break;
-                    case 'C': command = Tetris::Input::move_right; break;
-                    case 'B': command = Tetris::Input::soft_drop; break;
+                    case 'D': command = Tetris::Input::Value::move_left; break;
+                    case 'C': command = Tetris::Input::Value::move_right; break;
+                    case 'B': command = Tetris::Input::Value::soft_drop; break;
                     default: continue;
                     }
                 } else {
                     continue;
                 }
                 break;
-            case 'z': command = Tetris::Input::rotate_left; break;
-            case 'x': command = Tetris::Input::rotate_right; break;
-            case ' ': command = Tetris::Input::hard_drop; break;
-            case 'q': command = Tetris::Input::quit; break;
-            case 'c': command = Tetris::Input::hold; break;
+            case 'z': command = Tetris::Input::Value::rotate_left; break;
+            case 'x': command = Tetris::Input::Value::rotate_right; break;
+            case ' ': command = Tetris::Input::Value::hard_drop; break;
+            case 'q': command = Tetris::Input::Value::quit; break;
+            case 'c': command = Tetris::Input::Value::hold; break;
             case 'r': old_screen.clear(0); continue; // redraw
             default: continue;
             }
-            inputs.push({command, Tetris::Input::pressed, input_frame});
-            inputs.push({command, Tetris::Input::released, input_frame});
+            inputs.push({command, Tetris::Input::State::pressed, input_frame});
+            inputs.push({command, Tetris::Input::State::released, input_frame});
         }
 
         return Tetris::tic(elapsed, inputs);
@@ -207,9 +207,9 @@ class TetrisConsole : public Tetris {
             held_block.paste(screen, held_box.pos() + Point{1, 1}, xscale);
         }
 
-        if (game_state == GAME_OVER || game_state == WELCOME) {
+        if (game_state == GameState::GAME_OVER || game_state == GameState::WELCOME) {
             draw_box(intro_box);
-            const auto *msg = (game_state == WELCOME) ? "Ready?\n"
+            const auto *msg = (game_state == GameState::WELCOME) ? "Ready?\n"
                                                         "Press space to start\n\n"
                                                         "z:     rotate left\n"
                                                         "x:     rotate right\n"

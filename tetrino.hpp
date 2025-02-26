@@ -1,5 +1,5 @@
-#ifndef __tetris_hpp__
-#define __tetris_hpp__
+#ifndef TETRINO_HPP
+#define TETRINO_HPP
 
 #include <algorithm>
 #include <array>
@@ -16,11 +16,11 @@ struct Point {
     int y;
     constexpr Point operator+(Point p) const { return {x + p.x, y + p.y}; }
     constexpr Point operator-(Point p) const { return {x - p.x, y - p.y}; }
-    Point &operator+=(Point p) {
+    constexpr Point &operator+=(Point p) {
         *this = *this + p;
         return *this;
     }
-    Point operator*(int s) const { return {x * s, y * s}; }
+    constexpr Point operator*(int s) const { return {x * s, y * s}; }
 };
 
 constexpr Point shift_down{0, 1};
@@ -238,8 +238,11 @@ class Tetris {
     static constexpr int matrix_height = 40;
     static constexpr int skyline = 20;
 
+    enum class GameState { WELCOME, GAME_OVER, PLAY };
+    enum class MoveType { TSPIN, MINI_TSPIN, NORMAL };
+
     struct Input {
-        enum value_t {
+        enum class Value {
             rotate_left,
             rotate_right,
             move_left,
@@ -249,12 +252,12 @@ class Tetris {
             hold,
             quit
         } value;
-        enum state_t { pressed, released } state;
+        enum class State { pressed, released } state;
         ssize_t frame;
     };
 
     Tetris(unsigned int seed = 0)
-        : rng{seed}, alive{true}, game_state{WELCOME}, controller_state{}, command_state{} {}
+        : rng{seed}, alive{true}, game_state{GameState::WELCOME}, controller_state{}, command_state{} {}
 
     void set_level(int level) {
         level = level;
@@ -285,14 +288,14 @@ class Tetris {
 
         respawn(0, block);
 
-        game_state = PLAY;
+        game_state = GameState::PLAY;
     }
 
     void lock(ssize_t time) {
         block.paste(matrix, block.pos);
 
         if (block.pos.y < matrix_height - skyline) {
-            game_state = GAME_OVER;
+            game_state = GameState::GAME_OVER;
         } else {
             clear_rows();
             can_hold = true;
@@ -309,13 +312,11 @@ class Tetris {
         scheduled_drop_is_soft = false;
         lowest_y = block.pos.y;
         num_moves_left = max_num_moves;
-        last_move = NORMAL;
+        last_move = MoveType::NORMAL;
         back_to_back = 0;
     }
 
-    bool can_fall(const Tetrimino &block) const {
-        return block.can_paste(matrix, block.pos + shift_down);
-    }
+    bool can_fall(const Tetrimino &block) const { return block.can_paste(matrix, block.pos + shift_down); }
     bool can_fit(const Tetrimino &block) const { return block.can_paste(matrix, block.pos); }
     int drop(const Tetrimino &block) const {
         int y = block.pos.y, oky = y;
@@ -342,23 +343,23 @@ class Tetris {
         game_time += time;
 
         // Other screens.
-        if (game_state == WELCOME || game_state == GAME_OVER) {
+        if (game_state == GameState::WELCOME || game_state == GameState::GAME_OVER) {
             while (!inputs.empty()) {
                 auto key = inputs.front();
                 inputs.pop();
                 switch (key.value) {
-                case Input::hard_drop: {
-                    if (key.state == IN::released) break;
-                    if (game_state == WELCOME) {
+                case IN::Value::hard_drop: {
+                    if (key.state == IN::State::released) break;
+                    if (game_state == GameState::WELCOME) {
                         new_game(1);
-                    } else if (game_state == GAME_OVER) {
-                        game_state = WELCOME;
+                    } else if (game_state == GameState::GAME_OVER) {
+                        game_state = GameState::WELCOME;
                     } else {
                         // Ignore must have started already
                     }
                     break;
                 }
-                case Input::quit: alive = false; break;
+                case IN::Value::quit: alive = false; break;
                 default: break;
                 }
             }
@@ -366,10 +367,10 @@ class Tetris {
         }
 
         // Run all events behind the current frame time.
-        while (game_state != GAME_OVER && alive) {
+        while (game_state != GameState::GAME_OVER && alive) {
 
             // After a successful move, apply extended locking rules.
-            auto accept_move = [&, this](move_t type, int now) {
+            auto accept_move = [&, this](MoveType type, int now) {
                 if (lock_time < never && num_moves_left > 0) {
                     num_moves_left--;
                     lock_time = std::max(lock_time, now + lock_period);
@@ -381,7 +382,7 @@ class Tetris {
             auto translate = [&, this](int shift, int time) {
                 if (block.can_paste(matrix, block.pos + Point{shift, 0})) {
                     block.pos += {shift, 0};
-                    accept_move(NORMAL, time);
+                    accept_move(MoveType::NORMAL, time);
                 }
             };
 
@@ -401,7 +402,7 @@ class Tetris {
                 // Lockdown event
                 else if (lock_time <= current_time) {
                     lock(lock_time);
-                    if (game_state == GAME_OVER) goto done;
+                    if (game_state == GameState::GAME_OVER) goto done;
                 }
 
                 // Fall event
@@ -422,19 +423,19 @@ class Tetris {
                     auto input = inputs.front();
                     inputs.pop();
                     switch (input.value) {
-                    case Input::quit:
-                        if (input.state == IN::released) alive = false;
+                    case IN::Value::quit:
+                        if (input.state == IN::State::released) alive = false;
                         break;
 
-                    case Input::move_left:
-                        controller_state.left = command_state.left = (input.state == IN::pressed);
+                    case IN::Value::move_left:
+                        controller_state.left = command_state.left = (input.state == IN::State::pressed);
                         command_state.right =
-                            (input.state == IN::released) && controller_state.right;
+                            (input.state == IN::State::released) && controller_state.right;
                         goto translate_now;
 
-                    case Input::move_right:
-                        controller_state.right = command_state.right = (input.state == IN::pressed);
-                        command_state.left = (input.state == IN::released) && controller_state.left;
+                    case IN::Value::move_right:
+                        controller_state.right = command_state.right = (input.state == IN::State::pressed);
+                        command_state.left = (input.state == IN::State::released) && controller_state.left;
 
                     translate_now:
                         if (command_state.left || command_state.right) {
@@ -445,10 +446,10 @@ class Tetris {
                         }
                         break;
 
-                    case Input::rotate_left:
-                    case Input::rotate_right: {
-                        if (input.state == IN::released) break;
-                        int dr = (input.value == Input::rotate_left) ? -1 : 1;
+                    case IN::Value::rotate_left:
+                    case IN::Value::rotate_right: {
+                        if (input.state == IN::State::released) break;
+                        int dr = (input.value == IN::Value::rotate_left) ? -1 : 1;
                         const auto &kicks =
                             wall_kicks[block.type == Tetrimino::I][dr > 0][block.rot];
                         block.rotate((block.rot + dr) & 3);
@@ -456,7 +457,7 @@ class Tetris {
                             if (block.can_paste(matrix, block.pos + kicks[k])) {
                                 block.pos += kicks[k];
                                 // Check for T-Spin and Mini T-Spin.
-                                move_t type = NORMAL;
+                                MoveType type = MoveType::NORMAL;
                                 if (block.type == Tetrimino::T) {
                                     const auto &pts = tspin_corners[block.rot];
                                     auto A = matrix.occupied(block.pos + pts[0]);
@@ -464,11 +465,11 @@ class Tetris {
                                     auto C = matrix.occupied(block.pos + pts[2]);
                                     auto D = matrix.occupied(block.pos + pts[3]);
                                     if (k == 4) {
-                                        type = TSPIN;
+                                        type = MoveType::TSPIN;
                                     } else if ((A && B) && (C || D)) {
-                                        type = TSPIN;
+                                        type = MoveType::TSPIN;
                                     } else if ((A || B) && (C && D)) {
-                                        type = MINI_TSPIN;
+                                        type = MoveType::MINI_TSPIN;
                                     }
                                 }
                                 accept_move(type, input_time);
@@ -480,18 +481,18 @@ class Tetris {
                         break;
                     }
 
-                    case Input::hard_drop: {
-                        if (input.state == IN::released) break;
+                    case IN::Value::hard_drop: {
+                        if (input.state == IN::State::released) break;
                         int y = drop(block);
                         tally += 2 * (y - block.pos.y);
                         block.pos.y = y;
                         lock(input_time);
-                        if (game_state == GAME_OVER) goto done;
+                        if (game_state == GameState::GAME_OVER) goto done;
                         break;
                     }
 
-                    case Input::soft_drop: {
-                        command_state.down = (input.state == IN::pressed);
+                    case IN::Value::soft_drop: {
+                        command_state.down = (input.state == IN::State::pressed);
                         if (command_state.down) {
                             fall_time = input_time;
                             scheduled_drop_is_soft = true;
@@ -503,8 +504,8 @@ class Tetris {
                         break;
                     }
 
-                    case Input::hold: {
-                        if (input.state == IN::released) break;
+                    case IN::Value::hold: {
+                        if (input.state == IN::State::released) break;
                         if (can_hold) {
                             can_hold = false;
                             if (held_block.type != Tetrimino::none) {
@@ -568,10 +569,10 @@ class Tetris {
     bool can_hold;
     int lowest_y;
     int scheduled_drop_is_soft;
-    enum move_t { TSPIN, MINI_TSPIN, NORMAL } last_move;
+    MoveType last_move;
     int back_to_back;
     std::mt19937 rng;
-    enum { WELCOME, GAME_OVER, PLAY } game_state;
+    GameState game_state;
     struct {
         bool left : 1;
         bool right : 1;
@@ -628,7 +629,7 @@ class Tetris {
         break;
 
         switch (last_move) {
-        case NORMAL:
+        case MoveType::NORMAL:
             switch (num_cleared) {
                 CASE(1, "Single", 100, = 0);
                 CASE(2, "Double", 300, = 0);
@@ -636,14 +637,14 @@ class Tetris {
                 CASE(4, "Tetris", 800, += 1);
             }
             break;
-        case MINI_TSPIN:
+        case MoveType::MINI_TSPIN:
             switch (num_cleared) {
                 CASE(0, "Mini T-Spin", 100, );
                 CASE(1, "Mini T-Spin Single", 200, += 1);
             default: assert(false);
             }
             break;
-        case TSPIN:
+        case MoveType::TSPIN:
             switch (num_cleared) {
                 CASE(0, "T-Spin", 400, );
                 CASE(1, "T-Spin Single", 800, += 1);
@@ -679,4 +680,4 @@ class Tetris {
     }
 };
 
-#endif // __tetris_hpp__
+#endif // TETRINO_HPP
